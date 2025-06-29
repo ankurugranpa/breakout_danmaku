@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ブロック崩し弾幕シューティング</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background-color: #111;
+            font-family: Arial, sans-serif;
+            color: #fff;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 300px;
+            height: 100vh;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .left-panel, .right-panel {
+            background: #222;
+            border-radius: 10px;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .game-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+            border-radius: 10px;
+            padding: 20px;
+            position: relative;
+        }
+        
+        canvas {
+            border: 2px solid #fff;
+            background-color: #000;
+            border-radius: 5px;
+        }
+        
+        .game-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            right: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-size: 18px;
+        }
+        
+        .game-controls {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 10px;
+        }
+        
+        .game-status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+        }
+        
+        .skill-selection h3 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+            text-align: center;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        
+        .skill-option {
+            background: #333;
+            border: 2px solid #555;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .skill-option:hover {
+            background: #444;
+            border-color: #777;
+            transform: translateX(5px);
+        }
+        
+        .skill-option.selected {
+            background: #2a5a2a;
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.3);
+        }
+        
+        .skill-option h4 {
+            margin-bottom: 8px;
+            color: #fff;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .skill-number {
+            background: #4CAF50;
+            color: #000;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        
+        .skill-option.selected .skill-number {
+            background: #ffaa00;
+            animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        @keyframes skillFlash {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.2); opacity: 0.8; }
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        
+        .skill-option p {
+            font-size: 12px;
+            color: #ccc;
+            line-height: 1.4;
+        }
+        
+        .controls-panel h3 {
+            color: #ff8800;
+            margin-bottom: 20px;
+            text-align: center;
+            border-bottom: 2px solid #ff8800;
+            padding-bottom: 10px;
+        }
+        
+        .control-section {
+            background: #333;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .control-section h4 {
+            color: #ffaa44;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+        
+        .control-section p {
+            font-size: 12px;
+            line-height: 1.4;
+            margin-bottom: 8px;
+        }
+        
+        .fragment-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        
+        .fragment-type {
+            background: #444;
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            border-left: 3px solid;
+        }
+        
+        .fragment-type.fast { border-left-color: #ff4444; }
+        .fragment-type.slow { border-left-color: #4444ff; }
+        .fragment-type.large { border-left-color: #ff8844; }
+        
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        
+        .game-over {
+            color: #ff4444;
+            font-size: 28px;
+            margin: 20px 0;
+        }
+        
+        .game-clear {
+            color: #44ff44;
+            font-size: 28px;
+            margin: 20px 0;
+        }
+        
+        .game-over, .game-clear {
+            text-shadow: 0 0 10px currentColor;
+        }
+        
+        .game-over small, .game-clear small {
+            font-size: 14px;
+            color: #ccc;
+            font-weight: normal;
+            display: block;
+            margin-top: 10px;
+        }
+        
+        .danger {
+            color: #ff6666;
+            font-weight: bold;
+        }
+        
+        .skill-status {
+            color: #ffff00;
+            font-weight: bold;
+        }
+        
+        @media (max-width: 1600px) {
+            .main-container {
+                grid-template-columns: 280px 1fr 280px;
+            }
+            canvas {
+                width: 720px;
+                height: 560px;
+            }
+        }
+        
+        @media (max-width: 1400px) {
+            .main-container {
+                grid-template-columns: 250px 1fr 250px;
+            }
+            canvas {
+                width: 640px;
+                height: 480px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- 左パネル: スキル選択 -->
+        <div class="left-panel">
+            <div class="skill-selection">
+                <h3>🎯 スキル選択</h3>
+                <p style="text-align: center; margin-bottom: 20px; color: #ccc;">
+                    使用回数: <span style="color: #4CAF50; font-weight: bold;">5回まで</span><br>
+                    <span style="color: #ffaa00; font-size: 12px;">プレイ中に1~6キーで切り替え可能</span>
+                </p>
+                
+                <div class="skill-option selected" onclick="selectSkill('clearFragments')" id="skill-clearFragments">
+                    <h4><span class="skill-number">1</span> 🧹 破片除去</h4>
+                    <p>プレイエリア内の全破片を瞬時に除去。緊急脱出に最適。</p>
+                </div>
+                
+                <div class="skill-option" onclick="selectSkill('invincible')" id="skill-invincible">
+                    <h4><span class="skill-number">2</span> 🛡️ 無敵モード</h4>
+                    <p>10秒間破片に当たってもゲームオーバーにならない。</p>
+                </div>
+                
+                <div class="skill-option" onclick="selectSkill('freeMove')" id="skill-freeMove">
+                    <h4><span class="skill-number">3</span> 🚀 自由移動</h4>
+                    <p>10秒間画面全体を自由に移動可能。上部エリアにも侵入。</p>
+                </div>
+                
+                <div class="skill-option" onclick="selectSkill('timeStop')" id="skill-timeStop">
+                    <h4><span class="skill-number">4</span> ⏰ 時間停止</h4>
+                    <p>5秒間すべての破片とボールが停止。戦略立案に。</p>
+                </div>
+                
+                <div class="skill-option" onclick="selectSkill('magneticField')" id="skill-magneticField">
+                    <h4><span class="skill-number">5</span> 🧲 磁力フィールド</h4>
+                    <p>8秒間破片を引き寄せて画面下部で消去。自動処理。</p>
+                </div>
+                
+                <div class="skill-option" onclick="selectSkill('multiball')" id="skill-multiball">
+                    <h4><span class="skill-number">6</span> ⚽ マルチボール</h4>
+                    <p>15秒間追加で2個のボールが出現。破壊効率3倍。</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 中央: ゲーム画面 -->
+        <div class="game-area">
+            <div class="game-info">
+                <div>
+                    スコア: <span id="score">0</span>
+                </div>
+                <div>
+                    選択スキル: <span id="selectedSkill" style="color: #4CAF50; font-weight: bold;">破片除去</span>
+                </div>
+                <div>
+                    破片数: <span id="fragments">0</span> | 
+                    スキル残り: <span id="skillCount" style="color: #ffaa00; font-weight: bold;">5</span>回
+                </div>
+            </div>
+            
+            <canvas id="gameCanvas" width="800" height="600"></canvas>
+            
+            <div class="game-status" id="gameStatus"></div>
+            
+            <div id="skillStatus" class="skill-status" style="position: absolute; top: 80px; left: 50%; transform: translateX(-50%);"></div>
+            
+            <div class="game-controls">
+                <button onclick="startGame()">ゲーム開始 (Enter)</button>
+                <button onclick="resetGame()">リセット</button>
+            </div>
+        </div>
+
+        <!-- 右パネル: 操作方法 -->
+        <div class="right-panel">
+            <div class="controls-panel">
+                <h3>🎮 操作方法</h3>
+                
+                <div class="control-section">
+                    <h4>ゲーム制御</h4>
+                    <p><strong>Enter キー</strong>でゲーム開始</p>
+                    <p>ゲーム終了後は初期状態に戻る</p>
+                    <p>ボタンクリックでも操作可能</p>
+                </div>
+                
+                <div class="control-section">
+                    <h4>基本操作</h4>
+                    <p>← → ↑ ↓ 矢印キー</p>
+                    <p>または W A S D キー</p>
+                    <p>でパドルを高速移動</p>
+                </div>
+                
+                <div class="control-section">
+                    <h4>スキル操作</h4>
+                    <p><strong>スペース キー</strong>でスキル発動</p>
+                    <p><strong>1~6 キー</strong>でスキル切り替え</p>
+                    <p>（合計5回まで使用可能）</p>
+                </div>
+                
+                <div class="control-section">
+                    <h4>ゲーム目標</h4>
+                    <p>全240個のブロックを破壊</p>
+                    <p class="danger">⚠️ 破片に当たるとゲームオーバー</p>
+                    <p>ボールを落とすとゲームオーバー</p>
+                </div>
+                
+                <div class="control-section">
+                    <h4>破片の種類</h4>
+                    <div class="fragment-legend">
+                        <div class="fragment-type fast">⚡ 超高速</div>
+                        <div class="fragment-type slow">❄️ 低速</div>
+                        <div class="fragment-type large">⭐ 巨大</div>
+                    </div>
+                    <p style="margin-top: 10px; font-size: 11px;">
+                        赤い破片は超危険！青い破片は回避しやすい。オレンジ破片は大きくて危険。
+                    </p>
+                </div>
+                
+                <div class="control-section">
+                    <h4>戦略のコツ</h4>
+                    <p>• 序盤: 破片除去(1)で安全確保</p>
+                    <p>• 中盤: 無敵モード(2)で積極的に</p>
+                    <p>• 終盤: マルチボール(6)で一気に</p>
+                    <p>• 緊急時: 時間停止(4)で体勢立て直し</p>
+                    <p>• プレイ中に1~6キーで切り替え可能</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('score');
+        const fragmentsElement = document.getElementById('fragments');
+        const skillCountElement = document.getElementById('skillCount');
+        const selectedSkillElement = document.getElementById('selectedSkill');
+        const skillStatusElement = document.getElementById('skillStatus');
+        const gameStatusElement = document.getElementById('gameStatus');
+
+        // ゲーム変数
+        let gameRunning = false;
+        let score = 0;
+        let animationId;
+
+        // スキルシステム
+        let skillCount = 5;
+        let selectedSkill = 'clearFragments';
+        let skillActive = false;
+        let skillTimer = 0;
+        let skillEffects = {
+            invincible: false,
+            freeMove: false,
+            timeStop: false,
+            magneticField: false,
+            multiball: false
+        };
+
+        // スキル番号マッピング
+        const skillNumberMap = {
+            '1': 'clearFragments',
+            '2': 'invincible', 
+            '3': 'freeMove',
+            '4': 'timeStop',
+            '5': 'magneticField',
+            '6': 'multiball'
+        };
+
+        // 追加ボール（マルチボール用）
+        const extraBalls = [];
+        
+        // スキル効果のパーティクル
+        const skillEffectParticles = [];
+
+        // パドル（上下左右に移動可能）- サイズ半分、速度2倍
+        const paddle = {
+            x: canvas.width / 2 - 20,
+            y: canvas.height - 60,
+            width: 40,  // 80 → 40 (半分)
+            height: 6,  // 12 → 6 (半分)
+            speed: 12   // 6 → 12 (2倍)
+        };
+
+        // ボール
+        const ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 6,
+            dx: 3,
+            dy: -3
+        };
+
+        // ブロック（4倍細かく）
+        const bricks = [];
+        const brickRows = 12; // 6 → 12
+        const brickCols = 20; // 10 → 20
+        const brickWidth = 35; // 70 → 35
+        const brickHeight = 12; // 20 → 12
+        const brickPadding = 2;
+        const brickOffsetTop = 40;
+        const brickOffsetLeft = 40;
+
+        // 破片（危険な弾幕）
+        const fragments = [];
+
+        // キー入力
+        const keys = {};
+
+        // イベントリスナー
+        document.addEventListener('keydown', (e) => {
+            keys[e.key] = true;
+            
+            // ゲーム開始・初期状態に戻る（Enterキー）
+            if (e.key === 'Enter' && !gameRunning) {
+                e.preventDefault();
+                if (gameStatusElement.innerHTML !== '') {
+                    // ゲーム終了後の場合は初期状態に戻る
+                    resetGame();
+                } else {
+                    // 初期状態の場合はゲーム開始
+                    startGame();
+                }
+            }
+            
+            // スキル発動（スペースキー）
+            if (e.key === ' ' && gameRunning && skillCount > 0 && !skillActive) {
+                e.preventDefault(); // スペースキーのデフォルト動作を防ぐ
+                activateSkill();
+            }
+            
+            // スキル切り替え（1~6キー）
+            if (gameRunning && skillNumberMap[e.key]) {
+                selectSkill(skillNumberMap[e.key]);
+            }
+        });
+
+        document.addEventListener('keyup', (e) => {
+            keys[e.key] = false;
+        });
+
+        // スキル選択
+        function selectSkill(skillName) {
+            selectedSkill = skillName;
+            
+            // 全てのスキルオプションから選択状態を削除
+            document.querySelectorAll('.skill-option').forEach(option => {
+                option.classList.remove('selected');
+            });
+            
+            // 選択されたスキルに選択状態を追加
+            document.getElementById('skill-' + skillName).classList.add('selected');
+            
+            // スキル名を表示
+            const skillNames = {
+                'clearFragments': '破片除去',
+                'invincible': '無敵モード',
+                'freeMove': '自由移動',
+                'timeStop': '時間停止',
+                'magneticField': '磁力フィールド',
+                'multiball': 'マルチボール'
+            };
+            
+            selectedSkillElement.textContent = skillNames[skillName];
+        }
+
+        // スキル発動
+        function activateSkill() {
+            if (skillCount <= 0 || skillActive) return;
+            
+            skillCount--;
+            skillCountElement.textContent = skillCount;
+            
+            switch(selectedSkill) {
+                case 'clearFragments':
+                    // プレイエリア内の破片を全て除去
+                    fragments.length = 0;
+                    skillStatusElement.innerHTML = '<span style="color: #00ff00; font-size: 20px; animation: skillFlash 1s;">🧹 破片除去発動！</span>';
+                    setTimeout(() => skillStatusElement.innerHTML = '', 2000);
+                    
+                    // 破片除去のアニメーション効果
+                    createSkillEffect('clearFragments');
+                    break;
+                    
+                case 'invincible':
+                    skillEffects.invincible = true;
+                    skillActive = true;
+                    skillTimer = 10000; // 10秒
+                    createSkillEffect('invincible');
+                    break;
+                    
+                case 'freeMove':
+                    skillEffects.freeMove = true;
+                    skillActive = true;
+                    skillTimer = 10000; // 10秒
+                    createSkillEffect('freeMove');
+                    break;
+                    
+                case 'timeStop':
+                    skillEffects.timeStop = true;
+                    skillActive = true;
+                    skillTimer = 5000; // 5秒
+                    createSkillEffect('timeStop');
+                    break;
+                    
+                case 'magneticField':
+                    skillEffects.magneticField = true;
+                    skillActive = true;
+                    skillTimer = 8000; // 8秒
+                    createSkillEffect('magneticField');
+                    break;
+                    
+                case 'multiball':
+                    // 追加ボールを2個生成
+                    for (let i = 0; i < 2; i++) {
+                        extraBalls.push({
+                            x: ball.x + (i - 0.5) * 50,
+                            y: ball.y,
+                            radius: ball.radius,
+                            dx: ball.dx * (0.8 + Math.random() * 0.4),
+                            dy: ball.dy * (0.8 + Math.random() * 0.4)
+                        });
+                    }
+                    skillEffects.multiball = true;
+                    skillActive = true;
+                    skillTimer = 15000; // 15秒
+                    createSkillEffect('multiball');
+                    break;
+            }
+        }
+
+        // スキル発動時の視覚効果
+        function createSkillEffect(skillType) {
+            const effect = {
+                type: skillType,
+                startTime: Date.now(),
+                particles: []
+            };
+            
+            // パーティクル生成
+            for (let i = 0; i < 20; i++) {
+                effect.particles.push({
+                    x: paddle.x + paddle.width / 2,
+                    y: paddle.y + paddle.height / 2,
+                    dx: (Math.random() - 0.5) * 10,
+                    dy: (Math.random() - 0.5) * 10,
+                    life: 1.0,
+                    color: getSkillColor(skillType)
+                });
+            }
+            
+            skillEffectParticles.push(effect);
+        }
+
+        // スキルの色を取得
+        function getSkillColor(skillType) {
+            switch(skillType) {
+                case 'clearFragments': return '#00ff00';
+                case 'invincible': return '#ffff00';
+                case 'freeMove': return '#00ffff';
+                case 'timeStop': return '#ff0000';
+                case 'magneticField': return '#0080ff';
+                case 'multiball': return '#ff8800';
+                default: return '#ffffff';
+            }
+        }
+
+        // スキル効果の更新
+        function updateSkillEffects(deltaTime) {
+            if (skillActive && skillTimer > 0) {
+                skillTimer -= deltaTime;
+                
+                // 残り時間を表示
+                const remainingSeconds = Math.ceil(skillTimer / 1000);
+                let statusText = '';
+                let warningClass = '';
+                
+                if (skillTimer <= 2000) {
+                    warningClass = ' style="color: #ff4444; animation: blink 0.5s infinite;"';
+                }
+                
+                switch(selectedSkill) {
+                    case 'invincible':
+                        statusText = `🛡️ 無敵モード発動中！ 残り${remainingSeconds}秒`;
+                        break;
+                    case 'freeMove':
+                        statusText = `🚀 自由移動モード発動中！ 残り${remainingSeconds}秒`;
+                        break;
+                    case 'timeStop':
+                        statusText = `⏰ 時間停止発動中！ 残り${remainingSeconds}秒`;
+                        break;
+                    case 'magneticField':
+                        statusText = `🧲 磁力フィールド発動中！ 残り${remainingSeconds}秒`;
+                        break;
+                    case 'multiball':
+                        statusText = `⚽ マルチボール発動中！ 残り${remainingSeconds}秒`;
+                        break;
+                }
+                
+                skillStatusElement.innerHTML = `<span${warningClass}>${statusText}</span>`;
+                
+                if (skillTimer <= 0) {
+                    // スキル効果終了
+                    skillActive = false;
+                    skillEffects.invincible = false;
+                    skillEffects.freeMove = false;
+                    skillEffects.timeStop = false;
+                    skillEffects.magneticField = false;
+                    
+                    if (skillEffects.multiball) {
+                        extraBalls.length = 0;
+                        skillEffects.multiball = false;
+                    }
+                    
+                    skillStatusElement.textContent = '';
+                }
+            }
+        }
+        // ブロックを初期化
+        function initBricks() {
+            bricks.length = 0;
+            for (let r = 0; r < brickRows; r++) {
+                bricks[r] = [];
+                for (let c = 0; c < brickCols; c++) {
+                    bricks[r][c] = {
+                        x: c * (brickWidth + brickPadding) + brickOffsetLeft,
+                        y: r * (brickHeight + brickPadding) + brickOffsetTop,
+                        width: brickWidth,
+                        height: brickHeight,
+                        visible: true,
+                        color: `hsl(${(r * 30 + c * 18) % 360}, 70%, 50%)`
+                    };
+                }
+            }
+        }
+
+        // 破片を生成（レアな破片システム追加）
+        function createFragments(x, y, color) {
+            const numFragments = 2;
+            for (let i = 0; i < numFragments; i++) {
+                const angle = Math.random() * Math.PI * 2;
+                let speed = 2 + Math.random() * 3;
+                let fragmentType = 'normal';
+                let fragmentColor = color;
+                
+                // レアな破片の生成（15%の確率）
+                const rareChance = Math.random();
+                if (rareChance < 0.05) {
+                    // 超高速破片（5%の確率）
+                    speed *= 3;
+                    fragmentType = 'fast';
+                    fragmentColor = '#ff0000'; // 赤色
+                } else if (rareChance < 0.10) {
+                    // 低速破片（5%の確率）
+                    speed *= 0.3;
+                    fragmentType = 'slow';
+                    fragmentColor = '#0080ff'; // 青色
+                } else if (rareChance < 0.15) {
+                    // 巨大破片（5%の確率）
+                    speed *= 0.7;
+                    fragmentType = 'large';
+                    fragmentColor = '#ff8000'; // オレンジ色
+                }
+                
+                const fragment = {
+                    x: x,
+                    y: y,
+                    width: brickWidth * 0.6,
+                    height: brickHeight * 0.6,
+                    dx: Math.cos(angle) * speed,
+                    dy: Math.sin(angle) * speed,
+                    color: fragmentColor,
+                    originalColor: color,
+                    rotation: 0,
+                    rotationSpeed: (Math.random() - 0.5) * 0.2,
+                    type: fragmentType,
+                    glowIntensity: 0
+                };
+                
+                // 特殊破片のサイズ調整
+                if (fragmentType === 'large') {
+                    fragment.width *= 1.5;
+                    fragment.height *= 1.5;
+                } else if (fragmentType === 'fast') {
+                    fragment.rotationSpeed *= 3;
+                }
+                
+                fragments.push(fragment);
+            }
+        }
+
+        // ゲームをリセット
+        function resetGame() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            gameRunning = false;
+            paddle.x = canvas.width / 2 - paddle.width / 2;
+            paddle.y = canvas.height - 60;
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.dx = 3 * (Math.random() > 0.5 ? 1 : -1);
+            ball.dy = -3;
+            score = 0;
+            fragments.length = 0;
+            extraBalls.length = 0;
+            skillEffectParticles.length = 0;
+            skillCount = 5;
+            skillActive = false;
+            skillTimer = 0;
+            skillEffects = {
+                invincible: false,
+                freeMove: false,
+                timeStop: false,
+                magneticField: false,
+                multiball: false
+            };
+            scoreElement.textContent = score;
+            fragmentsElement.textContent = fragments.length;
+            skillCountElement.textContent = skillCount;
+            skillStatusElement.textContent = '';
+            gameStatusElement.innerHTML = '';
+            initBricks();
+            draw();
+        }
+
+        // 衝突検出（矩形同士）
+        function rectCollision(rect1, rect2) {
+            return rect1.x < rect2.x + rect2.width &&
+                   rect1.x + rect1.width > rect2.x &&
+                   rect1.y < rect2.y + rect2.height &&
+                   rect1.y + rect1.height > rect2.y;
+        }
+
+        // ボールとブロックの衝突検出
+        function ballBrickCollision() {
+            for (let r = 0; r < brickRows; r++) {
+                for (let c = 0; c < brickCols; c++) {
+                    const brick = bricks[r][c];
+                    if (brick.visible) {
+                        if (ball.x + ball.radius > brick.x && 
+                            ball.x - ball.radius < brick.x + brick.width && 
+                            ball.y + ball.radius > brick.y && 
+                            ball.y - ball.radius < brick.y + brick.height) {
+                            
+                            // ボールの反射
+                            const ballCenterX = ball.x;
+                            const ballCenterY = ball.y;
+                            const brickCenterX = brick.x + brick.width / 2;
+                            const brickCenterY = brick.y + brick.height / 2;
+                            
+                            if (Math.abs(ballCenterX - brickCenterX) > Math.abs(ballCenterY - brickCenterY)) {
+                                ball.dx = -ball.dx;
+                            } else {
+                                ball.dy = -ball.dy;
+                            }
+                            
+                            // 破片を生成
+                            createFragments(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.color);
+                            
+                            brick.visible = false;
+                            score += 5;
+                            scoreElement.textContent = score;
+                            
+                            // 全ブロック破壊チェック
+                            if (score === brickRows * brickCols * 5) {
+                                gameStatusElement.innerHTML = '<div class="game-clear">🎉 ゲームクリア！弾幕を制覇！ 🎉<br><small>Enterキーで初期状態に戻る</small></div>';
+                                gameRunning = false;
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 破片とパドルの衝突検出
+        function fragmentPaddleCollision() {
+            if (skillEffects.invincible) return; // 無敵モード中は衝突しない
+            
+            for (let i = 0; i < fragments.length; i++) {
+                const fragment = fragments[i];
+                if (rectCollision(fragment, paddle)) {
+                    gameStatusElement.innerHTML = '<div class="game-over">💀 破片に当たってゲームオーバー！ 💀<br><small>Enterキーで初期状態に戻る</small></div>';
+                    gameRunning = false;
+                    return;
+                }
+            }
+        }
+
+        // 破片同士の衝突検出
+        function fragmentCollisions() {
+            for (let i = 0; i < fragments.length; i++) {
+                for (let j = i + 1; j < fragments.length; j++) {
+                    const frag1 = fragments[i];
+                    const frag2 = fragments[j];
+                    
+                    if (rectCollision(frag1, frag2)) {
+                        // 簡単な反射
+                        const tempDx = frag1.dx;
+                        const tempDy = frag1.dy;
+                        frag1.dx = frag2.dx;
+                        frag1.dy = frag2.dy;
+                        frag2.dx = tempDx;
+                        frag2.dy = tempDy;
+                        
+                        // 重なりを解消
+                        frag1.x += frag1.dx;
+                        frag1.y += frag1.dy;
+                        frag2.x += frag2.dx;
+                        frag2.y += frag2.dy;
+                    }
+                }
+            }
+        }
+
+        // パドルを描画
+        function drawPaddle() {
+            let paddleColor = '#00ff00';
+            
+            // スキル効果による色変更
+            if (skillEffects.invincible) {
+                paddleColor = '#ffff00'; // 黄色（無敵）
+            } else if (skillEffects.freeMove) {
+                paddleColor = '#00ffff'; // シアン（自由移動）
+            }
+            
+            ctx.fillStyle = paddleColor;
+            ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            
+            // パドルの境界線
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(paddle.x, paddle.y, paddle.width, paddle.height);
+            
+            // 無敵モード時のオーラ効果
+            if (skillEffects.invincible) {
+                ctx.shadowColor = '#ffff00';
+                ctx.shadowBlur = 15;
+                ctx.strokeStyle = '#ffff00';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(paddle.x - 2, paddle.y - 2, paddle.width + 4, paddle.height + 4);
+                ctx.shadowBlur = 0;
+            }
+        }
+
+        // ボールを描画
+        function drawBall() {
+            // メインボール
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = skillEffects.timeStop ? '#ff0000' : '#fff';
+            ctx.fill();
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+            ctx.closePath();
+            
+            // 追加ボール（マルチボール）
+            for (const extraBall of extraBalls) {
+                ctx.beginPath();
+                ctx.arc(extraBall.x, extraBall.y, extraBall.radius, 0, Math.PI * 2);
+                ctx.fillStyle = '#ff8800';
+                ctx.fill();
+                ctx.strokeStyle = '#cc6600';
+                ctx.lineWidth = 1;
+                ctx.stroke();
+                ctx.closePath();
+            }
+        }
+
+        // ブロックを描画
+        function drawBricks() {
+            for (let r = 0; r < brickRows; r++) {
+                for (let c = 0; c < brickCols; c++) {
+                    const brick = bricks[r][c];
+                    if (brick.visible) {
+                        ctx.fillStyle = brick.color;
+                        ctx.fillRect(brick.x, brick.y, brick.width, brick.height);
+                        
+                        // ブロックの境界線
+                        ctx.strokeStyle = '#fff';
+                        ctx.lineWidth = 0.5;
+                        ctx.strokeRect(brick.x, brick.y, brick.width, brick.height);
+                    }
+                }
+            }
+        }
+
+        // 破片を描画（レアな破片の特殊効果付き）
+        function drawFragments() {
+            for (const fragment of fragments) {
+                ctx.save();
+                ctx.translate(fragment.x + fragment.width / 2, fragment.y + fragment.height / 2);
+                ctx.rotate(fragment.rotation);
+                
+                // レアな破片の光る効果
+                if (fragment.type !== 'normal') {
+                    fragment.glowIntensity = (Math.sin(Date.now() * 0.01) + 1) * 0.5;
+                    
+                    // グロー効果
+                    ctx.shadowColor = fragment.color;
+                    ctx.shadowBlur = 10 + fragment.glowIntensity * 10;
+                }
+                
+                ctx.fillStyle = fragment.color;
+                ctx.fillRect(-fragment.width / 2, -fragment.height / 2, fragment.width, fragment.height);
+                
+                // 特殊破片の境界線
+                let strokeColor = '#ff0000';
+                let lineWidth = 1;
+                
+                if (fragment.type === 'fast') {
+                    strokeColor = '#ff4444';
+                    lineWidth = 2;
+                } else if (fragment.type === 'slow') {
+                    strokeColor = '#4444ff';
+                    lineWidth = 2;
+                } else if (fragment.type === 'large') {
+                    strokeColor = '#ff8844';
+                    lineWidth = 3;
+                }
+                
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = lineWidth;
+                ctx.strokeRect(-fragment.width / 2, -fragment.height / 2, fragment.width, fragment.height);
+                
+                // 特殊破片のマーク
+                if (fragment.type === 'fast') {
+                    // 稲妻マーク
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(-fragment.width/4, -fragment.height/4);
+                    ctx.lineTo(0, 0);
+                    ctx.lineTo(fragment.width/4, fragment.height/4);
+                    ctx.stroke();
+                } else if (fragment.type === 'slow') {
+                    // 雪の結晶マーク
+                    ctx.strokeStyle = '#88ccff';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(-fragment.width/4, 0);
+                    ctx.lineTo(fragment.width/4, 0);
+                    ctx.moveTo(0, -fragment.height/4);
+                    ctx.lineTo(0, fragment.height/4);
+                    ctx.stroke();
+                } else if (fragment.type === 'large') {
+                    // 星マーク
+                    ctx.fillStyle = '#ffff00';
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                ctx.shadowBlur = 0;
+                ctx.restore();
+            }
+        }
+
+        // パドルを更新（上下左右移動）
+        function updatePaddle() {
+            const moveArea = skillEffects.freeMove ? 
+                { minX: 0, maxX: canvas.width - paddle.width, minY: 0, maxY: canvas.height - paddle.height } :
+                { minX: 0, maxX: canvas.width - paddle.width, minY: canvas.height / 2, maxY: canvas.height - paddle.height };
+            
+            // 左右移動
+            if ((keys['ArrowLeft'] || keys['a'] || keys['A']) && paddle.x > moveArea.minX) {
+                paddle.x -= paddle.speed;
+            }
+            if ((keys['ArrowRight'] || keys['d'] || keys['D']) && paddle.x < moveArea.maxX) {
+                paddle.x += paddle.speed;
+            }
+            
+            // 上下移動
+            if ((keys['ArrowUp'] || keys['w'] || keys['W']) && paddle.y > moveArea.minY) {
+                paddle.y -= paddle.speed;
+            }
+            if ((keys['ArrowDown'] || keys['s'] || keys['S']) && paddle.y < moveArea.maxY) {
+                paddle.y += paddle.speed;
+            }
+        }
+
+        // ボールを更新
+        function updateBall() {
+            if (!skillEffects.timeStop) {
+                ball.x += ball.dx;
+                ball.y += ball.dy;
+
+                // 壁との衝突
+                if (ball.x + ball.radius > canvas.width || ball.x - ball.radius < 0) {
+                    ball.dx = -ball.dx;
+                }
+                if (ball.y - ball.radius < 0) {
+                    ball.dy = -ball.dy;
+                }
+
+                // パドルとの衝突
+                if (ball.y + ball.radius > paddle.y && 
+                    ball.y - ball.radius < paddle.y + paddle.height &&
+                    ball.x + ball.radius > paddle.x && 
+                    ball.x - ball.radius < paddle.x + paddle.width) {
+                    
+                    const hitPos = (ball.x - paddle.x) / paddle.width;
+                    ball.dx = 6 * (hitPos - 0.5);
+                    ball.dy = -Math.abs(ball.dy);
+                }
+
+                // ボールが下に落ちた場合
+                if (ball.y + ball.radius > canvas.height) {
+                    gameStatusElement.innerHTML = '<div class="game-over">💀 ボールを落としてゲームオーバー 💀<br><small>Enterキーで初期状態に戻る</small></div>';
+                    gameRunning = false;
+                }
+            }
+            
+            // 追加ボールの更新
+            if (!skillEffects.timeStop) {
+                for (let i = extraBalls.length - 1; i >= 0; i--) {
+                    const extraBall = extraBalls[i];
+                    extraBall.x += extraBall.dx;
+                    extraBall.y += extraBall.dy;
+
+                    // 壁との衝突
+                    if (extraBall.x + extraBall.radius > canvas.width || extraBall.x - extraBall.radius < 0) {
+                        extraBall.dx = -extraBall.dx;
+                    }
+                    if (extraBall.y - extraBall.radius < 0) {
+                        extraBall.dy = -extraBall.dy;
+                    }
+
+                    // パドルとの衝突
+                    if (extraBall.y + extraBall.radius > paddle.y && 
+                        extraBall.y - extraBall.radius < paddle.y + paddle.height &&
+                        extraBall.x + extraBall.radius > paddle.x && 
+                        extraBall.x - extraBall.radius < paddle.x + paddle.width) {
+                        
+                        const hitPos = (extraBall.x - paddle.x) / paddle.width;
+                        extraBall.dx = 6 * (hitPos - 0.5);
+                        extraBall.dy = -Math.abs(extraBall.dy);
+                    }
+
+                    // 追加ボールが下に落ちた場合は削除
+                    if (extraBall.y + extraBall.radius > canvas.height) {
+                        extraBalls.splice(i, 1);
+                    }
+                }
+            }
+        }
+
+        // 破片を更新
+        function updateFragments() {
+            if (skillEffects.timeStop) return; // 時間停止中は更新しない
+            
+            for (let i = fragments.length - 1; i >= 0; i--) {
+                const fragment = fragments[i];
+                
+                // 磁力フィールド効果
+                if (skillEffects.magneticField) {
+                    const centerX = canvas.width / 2;
+                    const centerY = canvas.height;
+                    const dx = centerX - fragment.x;
+                    const dy = centerY - fragment.y;
+                    const distance = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (distance > 0) {
+                        const force = 0.3;
+                        fragment.dx += (dx / distance) * force;
+                        fragment.dy += (dy / distance) * force;
+                    }
+                }
+                
+                fragment.x += fragment.dx;
+                fragment.y += fragment.dy;
+                fragment.rotation += fragment.rotationSpeed;
+                
+                // 左右の壁との衝突で反射
+                if (fragment.x <= 0 || fragment.x + fragment.width >= canvas.width) {
+                    fragment.dx = -fragment.dx;
+                    fragment.x = Math.max(0, Math.min(canvas.width - fragment.width, fragment.x));
+                }
+                
+                // 上の壁との衝突で反射
+                if (fragment.y <= 0) {
+                    fragment.dy = -fragment.dy;
+                    fragment.y = 0;
+                }
+                
+                // 下の壁に到達したら破片を削除（反射しない）
+                if (fragment.y + fragment.height >= canvas.height) {
+                    fragments.splice(i, 1);
+                    continue;
+                }
+                
+                // 画面外に出た破片を削除（念のため）
+                if (fragment.x < -100 || fragment.x > canvas.width + 100 || 
+                    fragment.y < -100) {
+                    fragments.splice(i, 1);
+                }
+            }
+            
+            fragmentsElement.textContent = fragments.length;
+        }
+
+        // スキル効果パーティクルの更新
+        function updateSkillEffectParticles() {
+            for (let i = skillEffectParticles.length - 1; i >= 0; i--) {
+                const effect = skillEffectParticles[i];
+                const elapsed = Date.now() - effect.startTime;
+                
+                if (elapsed > 2000) {
+                    skillEffectParticles.splice(i, 1);
+                    continue;
+                }
+                
+                for (let j = effect.particles.length - 1; j >= 0; j--) {
+                    const particle = effect.particles[j];
+                    particle.x += particle.dx;
+                    particle.y += particle.dy;
+                    particle.life -= 0.02;
+                    particle.dx *= 0.98;
+                    particle.dy *= 0.98;
+                    
+                    if (particle.life <= 0) {
+                        effect.particles.splice(j, 1);
+                    }
+                }
+            }
+        }
+
+        // スキル効果パーティクルの描画
+        function drawSkillEffectParticles() {
+            for (const effect of skillEffectParticles) {
+                for (const particle of effect.particles) {
+                    ctx.save();
+                    ctx.globalAlpha = particle.life;
+                    ctx.fillStyle = particle.color;
+                    ctx.beginPath();
+                    ctx.arc(particle.x, particle.y, 3 * particle.life, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+            }
+        }
+        // 画面をクリア
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+
+        // 描画
+        function draw() {
+            clearCanvas();
+            
+            // 磁力フィールドの視覚効果
+            if (skillEffects.magneticField) {
+                ctx.save();
+                const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height, 0, canvas.width/2, canvas.height, canvas.width);
+                gradient.addColorStop(0, 'rgba(0, 255, 255, 0.1)');
+                gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+                ctx.fillStyle = gradient;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+            
+            // 時間停止の視覚効果
+            if (skillEffects.timeStop) {
+                ctx.save();
+                ctx.fillStyle = 'rgba(255, 0, 0, 0.1)';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.restore();
+            }
+            
+            drawBricks();
+            drawPaddle();
+            drawBall();
+            drawFragments();
+            drawSkillEffectParticles();
+        }
+
+        // ゲームループ
+        function gameLoop() {
+            if (!gameRunning) {
+                return;
+            }
+
+            const currentTime = Date.now();
+            const deltaTime = currentTime - (gameLoop.lastTime || currentTime);
+            gameLoop.lastTime = currentTime;
+
+            updateSkillEffects(deltaTime);
+            updateSkillEffectParticles();
+            updatePaddle();
+            updateBall();
+            updateFragments();
+            
+            ballBrickCollision();
+            
+            // 追加ボールとブロックの衝突
+            for (const extraBall of extraBalls) {
+                ballBrickCollisionForBall(extraBall);
+            }
+            
+            fragmentPaddleCollision();
+            fragmentCollisions();
+            
+            draw();
+
+            animationId = requestAnimationFrame(gameLoop);
+        }
+
+        // 追加ボール用の衝突検出
+        function ballBrickCollisionForBall(ballObj) {
+            for (let r = 0; r < brickRows; r++) {
+                for (let c = 0; c < brickCols; c++) {
+                    const brick = bricks[r][c];
+                    if (brick.visible) {
+                        if (ballObj.x + ballObj.radius > brick.x && 
+                            ballObj.x - ballObj.radius < brick.x + brick.width && 
+                            ballObj.y + ballObj.radius > brick.y && 
+                            ballObj.y - ballObj.radius < brick.y + brick.height) {
+                            
+                            const ballCenterX = ballObj.x;
+                            const ballCenterY = ballObj.y;
+                            const brickCenterX = brick.x + brick.width / 2;
+                            const brickCenterY = brick.y + brick.height / 2;
+                            
+                            if (Math.abs(ballCenterX - brickCenterX) > Math.abs(ballCenterY - brickCenterY)) {
+                                ballObj.dx = -ballObj.dx;
+                            } else {
+                                ballObj.dy = -ballObj.dy;
+                            }
+                            
+                            createFragments(brick.x + brick.width / 2, brick.y + brick.height / 2, brick.color);
+                            
+                            brick.visible = false;
+                            score += 5;
+                            scoreElement.textContent = score;
+                            
+                            if (score === brickRows * brickCols * 5) {
+                                gameStatusElement.innerHTML = '<div class="game-clear">🎉 ゲームクリア！弾幕を制覇！ 🎉<br><small>Enterキーで初期状態に戻る</small></div>';
+                                gameRunning = false;
+                            }
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+
+        // ゲーム開始
+        function startGame() {
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            
+            gameRunning = true;
+            gameLoop();
+        }
+
+        // 初期化
+        initBricks();
+        selectSkill('clearFragments'); // デフォルトスキルを選択
+        draw();
+    </script>
+</body>
+</html>
